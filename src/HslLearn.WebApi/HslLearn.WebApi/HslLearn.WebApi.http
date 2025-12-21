@@ -1,0 +1,6 @@
+@HslLearn.WebApi_HostAddress = http://localhost:5139
+
+GET {{HslLearn.WebApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
