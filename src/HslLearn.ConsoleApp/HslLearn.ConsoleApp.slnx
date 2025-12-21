@@ -1,3 +1,4 @@
 <Solution>
+  <Project Path="../HslLearn.Core/HslLearn.Core/HslLearn.Core.csproj" />
   <Project Path="HslLearn.ConsoleApp/HslLearn.ConsoleApp.csproj" />
 </Solution>

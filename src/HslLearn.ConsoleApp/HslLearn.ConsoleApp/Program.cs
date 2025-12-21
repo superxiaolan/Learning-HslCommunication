@@ -1,51 +1,28 @@
-﻿using HslCommunication;
-using HslCommunication.ModBus;
+﻿using HslLearn.Core;
 
-// 1. 实例化 (IP: 127.0.0.1, Port: 502, Station: 1)
-// 注意：ModbusTcpNet 默认站号是 255，而模拟器默认通常是 1，建议显式指定
-ModbusTcpNet plc = new ModbusTcpNet("127.0.0.1", 502, 1);
+// 实例化封装的 Service
+var service = new ModbusService("127.0.0.1", 502, 1);
 
-Console.WriteLine("--- 开始连接模拟器 ---");
-
-// 2. 建立连接 (Hsl 的所有通讯几乎都要先 ConnectServer)
-OperateResult connect = plc.ConnectServer();
-
-if (!connect.IsSuccess)
+try
 {
-    Console.WriteLine($"连接失败：{connect.Message}");
-    return;
+    Console.WriteLine("正在连接...");
+    service.Connect();
+
+    // 核心修复：设置字节序为 CDAB (这是 Hsl 配合大多数模拟器的默认值)
+    service.SetByteOrder(HslCommunication.Core.DataFormat.CDAB);
+    // 测试读取浮点数 (地址 2)
+    float temp = await service.ReadTemperatureAsync("2");
+    Console.WriteLine($"[Service读取] 地址 2 的温度为: {temp} ℃");
+
+    // 测试写入短整数 (地址 0)
+    await service.WriteControlValueAsync("0", 789);
+    Console.WriteLine("[Service写入] 地址 0 已更新为 789");
 }
-
-Console.WriteLine("连接成功！");
-
-// 3. 读取数据 (以刚才在模拟器改的地址 0 为例)
-// OperateResult<T> 是 Hsl 的标准返回格式，包含是否成功、消息、以及核心内容 Content
-OperateResult<short> read = plc.ReadInt16("0");
-
-if (read.IsSuccess)
+catch (Exception ex)
 {
-    Console.WriteLine($"[读取成功] 地址 0 的值为: {read.Content}");
+    Console.WriteLine($"发生错误: {ex.Message}");
 }
-else
+finally
 {
-    Console.WriteLine($"[读取失败] 原因: {read.Message}");
+    service.Disconnect();
 }
-
-// 4. 写入数据
-short valueToWrite = 456;
-OperateResult write = plc.Write("0", valueToWrite);
-
-if (write.IsSuccess)
-{
-    Console.WriteLine($"[写入成功] 已将 {valueToWrite} 写入地址 0");
-    // 此时你去观察 Modbus Slave 模拟器，你会发现数值变了
-}
-else
-{
-    Console.WriteLine($"[写入失败] 原因: {write.Message}");
-}
-
-// 5. 断开连接
-plc.ConnectClose();
-Console.WriteLine("已安全断开连接。按任意键退出...");
-Console.ReadKey();
