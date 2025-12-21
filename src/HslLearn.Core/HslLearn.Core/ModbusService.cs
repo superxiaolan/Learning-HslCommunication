@@ -44,6 +44,16 @@ namespace HslLearn.Core
             _plc.ByteTransform.DataFormat = format;
         }
 
+        public async Task WriteTemperatureAsync(string address, float value)
+        {
+            // WriteAsync 支持多种重载，传入 float 会自动处理 4 字节写入
+            var result = await _plc.WriteAsync(address, value);
+            if (!result.IsSuccess)
+            {
+                throw new Exception($"写入浮点数失败: {result.Message}");
+            }
+        }
+
         public void Connect()
         {
             var result = _plc.ConnectServer();
