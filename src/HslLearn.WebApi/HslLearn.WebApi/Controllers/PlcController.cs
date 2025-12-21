@@ -34,5 +34,29 @@ namespace HslLearn.WebApi.Controllers
                 return BadRequest(new { success = false, message = ex.Message });
             }
         }
+
+        [HttpPost("write-temp")]
+        public async Task<IActionResult> WriteTemp([FromBody] WriteParams data)
+        {
+            try
+            {
+                await _modbusService.WriteTemperatureAsync(data.Address, data.Value);
+                return Ok(new
+                {
+                    success = true,
+                    message = $"已成功将 {data.Value} 写入地址 {data.Address}"
+                });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(new { success = false, message = ex.Message });
+            }
+        }
+
+        public class WriteParams
+        {
+            public string Address { get; set; } = "2";
+            public float Value { get; set; }
+        }
     }
 }
