@@ -11,4 +11,8 @@
     <PackageReference Include="HslCommunication" Version="9.7.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\HslLearn.Core\HslLearn.Core\HslLearn.Core.csproj" />
+  </ItemGroup>
+
 </Project>
