@@ -14,7 +14,25 @@ modbusService.Connect(); // 启动时开启连接
 modbusService.SetByteOrder(HslCommunication.Core.DataFormat.CDAB);
 builder.Services.AddSingleton(modbusService);
 
-builder.Services.AddControllers();
+// 找到这行代码并修改
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        // 设置属性名称策略为 null，即保持原样（大写开头）
+        options.JsonSerializerOptions.PropertyNamingPolicy = null;
+    });
+
+// 配置 CORS 策略，允许所有来源访问 API
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 // 在 builder.Build() 之前
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(
@@ -45,7 +63,8 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 app.UseAuthorization();
-
+//启用中间件 (必须放在 MapControllers 之前)
+app.UseCors("AllowAll");
 app.MapControllers();
 
 app.Run();
