@@ -1,4 +1,6 @@
 using HslLearn.Core;
+using HslLearn.Core.Data;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,9 +15,23 @@ modbusService.SetByteOrder(HslCommunication.Core.DataFormat.CDAB);
 builder.Services.AddSingleton(modbusService);
 
 builder.Services.AddControllers();
+// 在 builder.Build() 之前
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(
+        "Host=localhost;Database=mes_db;Username=postgres;Password=123456",
+        x => x.MigrationsAssembly("HslLearn.WebApi") // 【关键：让迁移文件生成在 WebApi 项目中】
+    ));
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+// Program.cs 中添加
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = "localhost:6379";
+    options.InstanceName = "MES_";
+});
+// 注册后台定时采集服务
+builder.Services.AddHostedService<HslLearn.WebApi.Services.PlcSamplingWorker>();
 
 var app = builder.Build();
 
