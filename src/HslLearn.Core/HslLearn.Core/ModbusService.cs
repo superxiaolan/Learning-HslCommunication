@@ -65,5 +65,35 @@ namespace HslLearn.Core
 
         public void Disconnect() => _plc.ConnectClose();
 
+        public async Task<T> ReadEntityAsync<T>() where T : new()
+        {
+            var entity = new T();
+            var properties = typeof(T).GetProperties();
+
+            foreach (var prop in properties)
+            {
+                var attr = prop.GetCustomAttributes(typeof(PlcAddressAttribute), false)
+                               .FirstOrDefault() as PlcAddressAttribute;
+
+                if (attr == null) continue;
+
+                // 根据属性类型，自动调用相应的 HslCommunication 读取方法
+                if (prop.PropertyType == typeof(float))
+                {
+                    var res = await _plc.ReadFloatAsync(attr.Address);
+                    if (res.IsSuccess) prop.SetValue(entity, res.Content);
+                }
+                else if (prop.PropertyType == typeof(short))
+                {
+                    var res = await _plc.ReadInt16Async(attr.Address);
+                    if (res.IsSuccess) prop.SetValue(entity, res.Content);
+                }
+            }
+
+            // 记得给时间戳赋值（如果模型里有这个字段且没在 PLC 里读的话）
+            var timeProp = typeof(T).GetProperty("Timestamp");
+            if (timeProp != null) timeProp.SetValue(entity, DateTime.UtcNow);
+            return entity;
+        }
     }
 }
