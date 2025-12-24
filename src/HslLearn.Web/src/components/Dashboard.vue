@@ -1,39 +1,68 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import * as signalR from '@microsoft/signalr'
 import axios from 'axios'
 
-// 定义响应式数据对象
-const deviceData = ref({
-  Temperature: 0,
-  StatusValue: 0,
-  Timestamp: ''
+const deviceData = ref({ 
+  temperature: 0, 
+  statusValue: 0, 
+  timestamp: '' 
 })
+let connection = null
+const targetTemp = ref(30.0)
+const isSending = ref(false)
+const statusMsg = ref('')
 
-let timer = null
-
-// 获取数据的函数
-const fetchLatestData = async () => {
+const sendTemperature = async () => {
+  isSending.value = true
+  statusMsg.value = '正在下发...'
   try {
-    // 替换为你真实的后端 API 地址
-    const response = await axios.get('https://localhost:7071/api/plc/latest') 
-    console.log('Raw Response:', response.data)
-    
-    deviceData.value = response.data
-    console.log('数据已更新:', deviceData.value)
-  } catch (error) {
-    console.error('无法获取 Redis 数据:', error)
+    // 注意：这里建议下发到你 Modbus Slave 里对应的地址（例如 "2"）
+    await axios.post('https://localhost:7071/api/plc/write-temp', {
+      address: "2", 
+      value: targetTemp.value
+    })
+    statusMsg.value = '下发成功！'
+    setTimeout(() => statusMsg.value = '', 3000)
+  } catch (err) {
+    statusMsg.value = '下发失败：' + err.message
+  } finally {
+    isSending.value = false
   }
 }
 
-onMounted(() => {
-  fetchLatestData() // 初始加载一次
-  // 设置每 1 秒轮询一次，模拟实时监控
-  timer = setInterval(fetchLatestData, 1000)
-})
+// Dashboard.vue
+onMounted(async () => {
+  // 1. 先尝试获取首屏快照（解决刚打开页面显示 0 的问题）
+  try {
+    const response = await axios.get('https://localhost:7071/api/plc/latest');
+    deviceData.value = response.data;
+    console.log('首屏数据加载成功');
+  } catch (err) {
+    console.error('首屏数据加载失败:', err);
+  }
+
+  // 2. 初始化并启动 SignalR
+  connection = new signalR.HubConnectionBuilder()
+    .withUrl('https://localhost:7071/deviceHub')
+    .withAutomaticReconnect()
+    .build();
+
+  connection.on('ReceiveDeviceData', (data) => {
+    console.log('收到实时推送:', data);
+    deviceData.value = data;
+  });
+
+  try {
+    await connection.start();
+    console.log('SignalR 连接成功！');
+  } catch (err) {
+    console.error('SignalR 连接失败:', err);
+  }
+});
 
 onUnmounted(() => {
-  // 组件卸载时清除定时器，防止内存泄漏
-  if (timer) clearInterval(timer)
+  if (connection) connection.stop()
 })
 </script>
 
@@ -43,14 +72,24 @@ onUnmounted(() => {
     <div class="card-container">
       <div class="card">
         <label>设备温度</label>
-        <div class="value">{{ deviceData.Temperature }} °C</div>
+        <div class="value">{{ deviceData.temperature }} °C</div>
       </div>
       <div class="card">
         <label>状态码</label>
-        <div class="value">{{ deviceData.StatusValue }}</div>
+        <div class="value">{{ deviceData.statusValue }}</div>
       </div>
     </div>
-    <p class="footer">最后更新时间: {{ new Date(deviceData.Timestamp).toLocaleString() }}</p>
+
+    <div class="card control-card">
+      <h3>远程控制</h3>
+      <div class="input-group">
+        <input v-model="targetTemp" type="number" placeholder="输入温度" />
+        <button @click="sendTemperature" :disabled="isSending">下发指令</button>
+      </div>
+      <p v-if="statusMsg">{{ statusMsg }}</p>
+    </div>
+
+    <p class="footer">最后更新时间: {{ new Date(deviceData.timestamp).toLocaleString() }}</p>
   </div>
 </template>
 
