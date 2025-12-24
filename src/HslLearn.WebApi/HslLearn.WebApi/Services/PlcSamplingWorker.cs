@@ -1,6 +1,8 @@
 ﻿using HslLearn.Core;
 using HslLearn.Core.Data; // 确保指向你的 AppDbContext 命名空间
 using HslLearn.Core.Entities;
+using HslLearn.WebApi.Hubs;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Caching.Distributed;
 using System.Text.Json; // 确保指向你的 DeviceDataLog 命名空间
 
@@ -12,17 +14,20 @@ namespace HslLearn.WebApi.Services
         private readonly ModbusService _modbusService;
         private readonly ILogger<PlcSamplingWorker> _logger;
         private readonly IDistributedCache _cache;
+        private readonly IHubContext<DeviceHub> _hubContext;// 注入上下文
 
         public PlcSamplingWorker(
             IServiceProvider serviceProvider,
             ModbusService modbusService,
             ILogger<PlcSamplingWorker> logger,
-            IDistributedCache cache)
+            IDistributedCache cache,
+            IHubContext<DeviceHub> hubContext)
         {
             _serviceProvider = serviceProvider;
             _modbusService = modbusService;
             _logger = logger;
             _cache = cache;
+            _hubContext = hubContext;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -50,6 +55,10 @@ namespace HslLearn.WebApi.Services
                         db.DeviceLogs.Add(data);
                         await db.SaveChangesAsync(stoppingToken);
 
+                        // 4. 通过 SignalR 广播到所有在线的连接的前端客户端
+                        await _hubContext.Clients.All.SendAsync("ReceiveDeviceData", data, cancellationToken: stoppingToken);
+
+                        _logger.LogInformation($"[SignalR 推送成功] Temp: {data.Temperature}");
                         _logger.LogInformation($"[自动采集成功] {DateTime.Now:HH:mm:ss} -> Temp: {data.Temperature}, Status: {data.StatusValue}");
                     }
                 }

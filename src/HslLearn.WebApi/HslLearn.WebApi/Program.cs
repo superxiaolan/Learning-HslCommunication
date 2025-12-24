@@ -1,5 +1,6 @@
 using HslLearn.Core;
 using HslLearn.Core.Data;
+using HslLearn.WebApi.Hubs;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,14 +23,17 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.PropertyNamingPolicy = null;
     });
 
+builder.Services.AddSignalR();
+
 // 配置 CORS 策略，允许所有来源访问 API
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins("http://localhost:5173") // 明确指定你的 Vue 端口
+              .AllowAnyMethod()
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowCredentials(); // 必须允许凭据
     });
 });
 
@@ -66,5 +70,7 @@ app.UseAuthorization();
 //启用中间件 (必须放在 MapControllers 之前)
 app.UseCors("AllowAll");
 app.MapControllers();
+// 映射 Hub 路由
+app.MapHub<DeviceHub>("/deviceHub");
 
 app.Run();
